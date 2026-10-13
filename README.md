@@ -4,8 +4,6 @@
 
 # binge
 
-### Pick a story. Make yourself comfortable.
-
 A native movie and series app for **Mac and iPad**, with a simple library, thoughtful playback controls, and a place to pick up where you left off.
 
 **[Download Public Beta 1](https://github.com/alfongraher/binge/releases/tag/v0.4.1-public-beta1)** · **[User guide](docs/USER-GUIDE.md)** · **[Report an issue](https://github.com/alfongraher/binge/issues)**
@@ -14,19 +12,19 @@ A native movie and series app for **Mac and iPad**, with a simple library, thoug
 
 ---
 
-## Your next watch, within reach
+## Home
 
 Home brings together popular titles, recommendations inspired by your recent viewing, and **Continue Watching**. Wide cards show your progress and remaining time, while movie and series labels help you find what you’re in the mood for.
 
 The featured banner cycles through titles. Open a title for more information, save it for later, or watch an available trailer.
 
-## A library that feels like yours
+## Library
 
 Keep everything organized in **Plan to Watch**, **Favourites**, **Watching**, and **Watched**. Search your saved titles, filter movies and series, and choose how they’re sorted.
 
 Mark something watched elsewhere, change its label, or remove it with Undo. Series remember watched episodes and highlight where you last left off.
 
-## Settle into the story
+## Continuity and ease to watch
 
 - **Resume easily.** Continue Watching keeps one current entry per show.
 - **Find more.** Explore movies and series by genre, search for a title, and keep browsing as more titles load while you scroll.
@@ -37,7 +35,7 @@ Mark something watched elsewhere, change its label, or remove it with Undo. Seri
 
 On Mac, use **Space** to play or pause, **Left/Right** to seek, and **Up/Down** to adjust volume. Local video files are also supported on Mac.
 
-## Your devices, on the same page
+## Your devices, on sync
 
 Optional **local network sync** shares viewing progress, watched episodes, library titles, favourites, and labels between your paired devices.
 
