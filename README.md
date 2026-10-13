@@ -14,15 +14,25 @@ A native movie and series app for **Mac and iPad**, with a simple library, thoug
 
 ## Home
 
+![Home on iPad: featured titles and Continue Watching](docs/screenshots/home-ipad.jpg)
+
 Home brings together popular titles, recommendations inspired by your recent viewing, and **Continue Watching**. Wide cards show your progress and remaining time, while movie and series labels help you find what you’re in the mood for.
 
 The featured banner cycles through titles. Open a title for more information, save it for later, or watch an available trailer.
 
 ## Library
 
+![Library on iPad: watchlists, favourites and viewing status](docs/screenshots/library-ipad.jpg)
+
 Keep everything organized in **Plan to Watch**, **Favourites**, **Watching**, and **Watched**. Search your saved titles, filter movies and series, and choose how they’re sorted.
 
 Mark something watched elsewhere, change its label, or remove it with Undo. Series remember watched episodes and highlight where you last left off.
+
+## Explore
+
+![Explore on iPad: movies, TV shows and genre filters](docs/screenshots/explore-ipad.jpg)
+
+Browse movies and series, filter by genre, or search for your next watch. More titles load as you scroll.
 
 ## Continuity and ease to watch
 
