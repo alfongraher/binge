@@ -1,0 +1,15 @@
+1
+00:00:01,000 --> 00:00:05,000
+binge · subtitles rendered by Apple’s player
+
+2
+00:00:06,000 --> 00:00:12,000
+MKV video and audio are copied, not re-encoded.
+
+3
+00:00:14,000 --> 00:00:20,000
+These captions should follow seeking and work in PiP.
+
+4
+00:00:22,000 --> 00:00:29,000
+Native iPad remux and subtitle test.

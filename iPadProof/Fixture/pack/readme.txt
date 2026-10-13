@@ -1,0 +1,1 @@
+Generated binge native engine fixture; no copyrighted media.
