@@ -58,7 +58,7 @@ Open Settings on both devices, enable sync, compare the pairing codes, and confi
 | | Mac | iPad |
 | --- | --- | --- |
 | Download | Mac `.zip` | Corrected iPad `.ipa` |
-| Requirements | Apple silicon · macOS 14+ | iPadOS 17+ |
+| Requirements | Apple silicon · macOS 14+ · Python 3.12 framework | iPadOS 17+ |
 | Installation | Extract and copy binge to Applications | Sign and install using a compatible sideloading tool |
 
 **[Get both versions →](https://github.com/alfongraher/binge/releases/tag/v0.4.2-security-update)**

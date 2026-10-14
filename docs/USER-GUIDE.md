@@ -67,7 +67,7 @@ Other signing tools may be usable, but have not been tested with this beta. This
 
 ## Install on Mac
 
-Obtain the current **binge.app** from the beta organizer, copy it to **Applications**, and open it. Share the entire app bundle rather than just its executable. The supplied bundle includes its playback runtime.
+Obtain the current **binge.app** from the beta organizer, copy it to **Applications**, and open it. Share the entire app bundle rather than just its executable. The supplied bundle includes its torrent module and FFmpeg. The current Mac beta additionally requires a Python 3.12 framework installation for torrent playback; the interpreter is not yet bundled. Use a maintained patch version.
 
 This beta uses a development signature rather than a notarized public installer. If macOS refuses to open it, send the organizer the exact message and your macOS version. Do not alter the bundle or disable system protections to troubleshoot it.
 
