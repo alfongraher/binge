@@ -6,7 +6,7 @@
 
 A native movie and series app for **Mac and iPad**, with a simple library, thoughtful playback controls, and a place to pick up where you left off.
 
-**[Download Public Beta 1](https://github.com/alfongraher/binge/releases/tag/v0.4.1-public-beta1)** · **[User guide](docs/USER-GUIDE.md)** · **[Report an issue](https://github.com/alfongraher/binge/issues)**
+**[Download Public Beta 1](https://github.com/alfongraher/binge/releases/tag/v0.4.2-security-update)** · **[User guide](docs/USER-GUIDE.md)** · **[Report an issue](https://github.com/alfongraher/binge/issues)**
 
 </div>
 
@@ -61,7 +61,7 @@ Open Settings on both devices, enable sync, compare the pairing codes, and confi
 | Requirements | Apple silicon · macOS 14+ | iPadOS 17+ |
 | Installation | Extract and copy binge to Applications | Sign and install using a compatible sideloading tool |
 
-**[Get both versions →](https://github.com/alfongraher/binge/releases/tag/v0.4.1-public-beta1)**
+**[Get both versions →](https://github.com/alfongraher/binge/releases/tag/v0.4.2-security-update)**
 
 The Mac beta is development-signed and has not been notarized. The iPad package needs signing for your device; it is not an App Store or TestFlight installation. AltStore is an expected installation route, but this build has not yet been verified through a fresh AltStore setup. Free-account sideloading requires periodic refresh.
 
@@ -76,12 +76,18 @@ Our physical iPad testing used an iPad Pro on iPadOS 27.0.1. Other models and ol
 
 Availability and startup time depend on the selected provider and source. You can connect additional compatible add-ons using their manifest URLs in Settings.
 
+## Security and privacy
+
+The latest beta includes patched media libraries, bounded add-on downloads, hardened device sync, and more private local data files. Read the [security review](docs/SECURITY-REVIEW.md) for the checks and remaining limits. Update both devices together for sync. Remote providers now require HTTPS; localhost HTTP remains available for local add-ons.
+
+No login is required, but providers and torrent peers can see network addresses and content requests.
+
 ## Help shape what comes next
 
-**Public Beta 1 · version 0.4.1 (10)** includes the iPad Explore pagination fix.
+**Public Beta 1 · version 0.4.2 (11)** includes the iPad Explore pagination fix.
 
 Some sources or subtitle formats may still need work. Completion uses an estimated credits window rather than exact credit detection, and the featured banner uses artwork rather than background trailer autoplay.
 
 If something feels wrong, **[tell us about it](https://github.com/alfongraher/binge/issues)**. Include your device, operating-system version, the title and source involved, and what happened. Screenshots and exact error messages help.
 
-The **[full user guide](docs/USER-GUIDE.md)** covers every main feature, device pairing, troubleshooting, and useful things to test. Repository and download access currently require an invitation while this project is private.
+The **[full user guide](docs/USER-GUIDE.md)** covers every main feature, device pairing, troubleshooting, and useful things to test. 

@@ -10,6 +10,7 @@ import Network
     private var listener: NWListener?
     private var connections: [UUID:NWConnection]=[:]
     private var tasks:[UUID:Task<Void,Never>]=[:]
+    private var headerTimers:[UUID:Task<Void,Never>]=[:]
     private let token=UUID().uuidString
     private var startup: CheckedContinuation<URL,Error>?
     private var externalCues:[SubtitleCue]?
@@ -45,11 +46,15 @@ import Network
         }
     }
     @MainActor private func accept(_ connection:NWConnection) {
+        guard connections.count<32 else { connection.cancel();return }
         let id=UUID();connections[id]=connection
+        headerTimers[id]=Task { @MainActor [weak self] in
+            try? await Task.sleep(for:.seconds(10));guard !Task.isCancelled else { return };connection.cancel();self?.headerTimers.removeValue(forKey:id)
+        }
         connection.stateUpdateHandler={ [weak self] state in
             Task { @MainActor in
-                if case .failed = state { self?.tasks.removeValue(forKey:id)?.cancel();self?.connections.removeValue(forKey:id) }
-                if case .cancelled = state { self?.tasks.removeValue(forKey:id)?.cancel();self?.connections.removeValue(forKey:id) }
+                if case .failed = state { self?.tasks.removeValue(forKey:id)?.cancel();self?.connections.removeValue(forKey:id);self?.headerTimers.removeValue(forKey:id)?.cancel() }
+                if case .cancelled = state { self?.tasks.removeValue(forKey:id)?.cancel();self?.connections.removeValue(forKey:id);self?.headerTimers.removeValue(forKey:id)?.cancel() }
             }
         }
         connection.start(queue:.main)
@@ -62,6 +67,7 @@ import Network
             var request=buffer;if let data { request.append(data) }
             if request.count>16384 || error != nil { connection.cancel();return }
             if let text=String(data:request,encoding:.utf8),text.contains("\r\n\r\n") {
+                self.headerTimers.removeValue(forKey:id)?.cancel()
                 self.tasks[id]=Task { @MainActor in await self.serve(connection,id:id,request:text) }
             } else if !complete { self.receive(connection,id:id,buffer:request) }
             else { connection.cancel() }
@@ -77,12 +83,14 @@ import Network
     }
     @MainActor private func serve(_ connection:NWConnection,id:UUID,request:String) async {
         defer { tasks.removeValue(forKey:id);connections.removeValue(forKey:id);connection.cancel() }
+        #if DEBUG
         if directory != nil && ProcessInfo.processInfo.arguments.contains("--stream-mkv") {
             let report=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("hls-http-log.txt")
             let line=(request.components(separatedBy:"\r\n").first ?? "")+"\n"
             if !FileManager.default.fileExists(atPath:report.path) { FileManager.default.createFile(atPath:report.path,contents:nil) }
             if let handle=try? FileHandle(forWritingTo:report) { try? handle.seekToEnd();try? handle.write(contentsOf:Data(line.utf8));try? handle.close() }
         }
+        #endif
         let lines=request.components(separatedBy:"\r\n")
         let parts=(lines.first ?? "").split(separator:" ")
         guard parts.count>=2,parts[0]=="GET" || parts[0]=="HEAD" else { return }
@@ -219,6 +227,7 @@ import Network
     }
     @MainActor func cancel() {
         startup?.resume(throwing:CancellationError());startup=nil
+        for timer in headerTimers.values { timer.cancel() };headerTimers.removeAll()
         listener?.cancel();listener=nil
         let active=Array(tasks.values);tasks.removeAll();for task in active { task.cancel() }
         let sockets=Array(connections.values);connections.removeAll();for connection in sockets { connection.cancel() }

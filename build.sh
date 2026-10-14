@@ -17,6 +17,7 @@ if [[ -d "$PWD/.runtime" ]]; then
     mkdir -p "$app/Contents/Resources/Runtime/node_modules/ffmpeg-static"
     cp "$PWD/.runtime/node_modules/ffmpeg-static/ffmpeg" "$app/Contents/Resources/Runtime/node_modules/ffmpeg-static/"
 fi
+cp -R "$PWD/iPadProof/Fixture/Notices" "$app/Contents/Resources/"
 cp "$PWD/Assets/binge.icns" "$app/Contents/Resources/binge.icns"
 cat > "$app/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -28,8 +29,8 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
 <key>CFBundleDisplayName</key><string>binge</string>
 <key>CFBundleIconFile</key><string>binge</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.4.1</string>
-<key>CFBundleVersion</key><string>10</string>
+<key>CFBundleShortVersionString</key><string>0.4.2</string>
+<key>CFBundleVersion</key><string>11</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>NSLocalNetworkUsageDescription</key><string>binge finds your paired devices to sync viewing progress and your library on this network.</string>
 <key>NSBonjourServices</key><array><string>_binge-sync._tcp</string></array>

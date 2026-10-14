@@ -1,6 +1,6 @@
 # binge — Public Beta 1 user guide
 
-**Version 0.4.1 (10) · Updated October 13, 2026**
+**Version 0.4.2 (11) · Updated October 13, 2026**
 
 binge is a movie and series player for iPad and Mac. Browse titles, organize a watchlist, play sources supplied by add-ons, resume your viewing, and optionally synchronize your library and history between nearby devices.
 
@@ -31,7 +31,9 @@ This release targets iPad, not iPhone. Source availability, startup time, subtit
 
 ### Get the current installer
 
-Ask the beta organizer for **`binge-0.4.1-public-beta1-pagination-fix.ipa`**. This includes the correction for Explore pagination. An older file without `pagination-fix` in its name does not contain that correction.
+Ask the beta organizer for **`binge-0.4.2-security-update.ipa`**. This includes the correction for Explore pagination. Version 0.4.2 also includes the security update.
+
+Update both devices to 0.4.2 or later for the new secure sync protocol. Remote add-on, subtitle and direct media URLs require HTTPS; localhost HTTP is supported for explicitly configured local providers.
 
 An `.ipa` is the iPad app package. Saving it in Files alone does not install it; a signing and installation tool is required. The organizer’s development signature is not a universal installation permission for every tester’s iPad.
 

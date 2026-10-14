@@ -16,6 +16,7 @@ private struct SyncWire:Codable {
     var kind:String
     var id:String?;var name:String?;var publicKey:Data?;var nonce:Data?;var pairing:Bool?
     var manual:Bool?
+    var version:Int?;var ephemeral:Data?;var counter:UInt64?
     var sealed:Data?
     var entries:[String:[String:SyncField]]?
 }
@@ -74,6 +75,7 @@ private struct SyncWire:Codable {
         automatic=defaults.object(forKey:"binge.sync.automatic") as? Bool ?? true
         syncHistory=defaults.object(forKey:"binge.sync.history") as? Bool ?? true
         syncLibrary=defaults.object(forKey:"binge.sync.library") as? Bool ?? true
+        try? PrivateDataFile.protectExisting(self.folder.appendingPathComponent("journal.json"))
         if let data=try? Data(contentsOf:self.folder.appendingPathComponent("journal.json")),let saved=try? JSONDecoder().decode(SyncJournal.self,from:data) { journal=saved }
         if let data=defaults.data(forKey:"binge.sync.paired"),let saved=try? JSONDecoder().decode([SyncPeer].self,from:data) { paired=saved }
     }
@@ -168,7 +170,7 @@ private struct SyncWire:Codable {
                 #endif
                 switch state {
                 case .ready:
-                    self.send(SyncWire(kind:"hello",id:self.deviceID,name:self.name,publicKey:self.privateKey?.publicKey.rawRepresentation,nonce:session.nonce,pairing:pairing,manual:session.manual),session:session)
+                    self.send(SyncWire(kind:"hello",id:self.deviceID,name:self.name,publicKey:self.privateKey?.publicKey.rawRepresentation,nonce:session.nonce,pairing:pairing,manual:session.manual,version:2,ephemeral:session.ephemeral.publicKey.rawRepresentation),session:session)
                     self.receive(session)
                 case .waiting(let error):self.status="Couldn’t reach the device: "+error.localizedDescription
                 case .failed(let error):self.status="Connection failed: "+error.localizedDescription;self.close(session.id)
@@ -185,7 +187,7 @@ private struct SyncWire:Codable {
             Task { @MainActor in
                 guard let self,self.sessions[session.id] != nil,let data,data.count==4,error==nil else { self?.close(session.id);return }
                 let size=data.reduce(0) {($0<<8)|Int($1)}
-                guard size>0,size<=4*1024*1024,!done else { self.close(session.id);return }
+                guard size>0,size<=(session.authorized ? 4*1024*1024 : 16384),!done else { self.close(session.id);return }
                 session.connection.receive(minimumIncompleteLength:size,maximumLength:size) { [weak self] bytes,_,finished,error in
                     Task { @MainActor in
                         guard let self,self.sessions[session.id] != nil,let bytes,bytes.count==size,error==nil,let wire=try? JSONDecoder().decode(SyncWire.self,from:bytes) else { self?.close(session.id);return }
@@ -201,12 +203,16 @@ private struct SyncWire:Codable {
         FileHandle.standardError.write(Data("sync frame: \(wire.kind)\n".utf8))
         #endif
         if wire.kind=="hello" {
+            guard wire.version==2 else { status="Update binge on both devices to use secure sync.";close(session.id);return }
             guard session.key==nil,let id=wire.id,id != deviceID,id.count<=128,session.expectedID==nil || session.expectedID==id,
                   let publicData=wire.publicKey,let remoteKey=try? Curve25519.KeyAgreement.PublicKey(rawRepresentation:publicData),let nonce=wire.nonce,nonce.count==16,
+                  let ephemeralData=wire.ephemeral,let remoteEphemeral=try? Curve25519.KeyAgreement.PublicKey(rawRepresentation:ephemeralData),
+                  let transient=try? session.ephemeral.sharedSecretFromKeyAgreement(with:remoteEphemeral),
                   let privateKey=self.privateKey,let secret=try? privateKey.sharedSecretFromKeyAgreement(with:remoteKey) else { close(session.id);return }
             session.remoteID=id;session.remoteName=String((wire.name ?? "binge device").prefix(80));session.remotePublic=publicData
             let salt=id<deviceID ? nonce+session.nonce : session.nonce+nonce
-            session.key=secret.hkdfDerivedSymmetricKey(using:SHA256.self,salt:salt,sharedInfo:Data("binge-sync-v1".utf8),outputByteCount:32)
+            let material=secret.withUnsafeBytes {Data($0)}+transient.withUnsafeBytes {Data($0)}
+            session.key=HKDF<SHA256>.deriveKey(inputKeyMaterial:SymmetricKey(data:material),salt:salt,info:Data("binge-sync-v2".utf8),outputByteCount:32)
             session.manual = session.manual || wire.manual==true || wire.pairing==true
             if let peer=paired.first(where:{$0.id==id}) {
                 guard peer.publicKey==publicData else { status="Device identity changed. Forget it and pair again.";close(session.id);return }
@@ -220,8 +226,9 @@ private struct SyncWire:Codable {
             }
             return
         }
-        guard wire.kind=="sealed",let key=session.key,let sealed=wire.sealed,let box=try? AES.GCM.SealedBox(combined:sealed),
-              let plain=try? AES.GCM.open(box,using:key),let message=try? JSONDecoder().decode(SyncWire.self,from:plain) else { close(session.id);return }
+        guard wire.kind=="sealed",let remoteID=session.remoteID,let counter=wire.counter,session.received<UInt64.max,counter==session.received+1,let key=session.key,let sealed=wire.sealed,let box=try? AES.GCM.SealedBox(combined:sealed),
+              let plain=try? AES.GCM.open(box,using:key,authenticating:Data("\(remoteID)|\(deviceID)|\(counter)".utf8)),let message=try? JSONDecoder().decode(SyncWire.self,from:plain) else { close(session.id);return }
+        session.received=counter
         if message.kind=="approved" { session.remoteApproved=true;finishApproval(session);return }
         guard session.authorized else { close(session.id);return }
         if message.kind=="request" { captureNow();sendState(session,manual:true);return }
@@ -274,8 +281,11 @@ private struct SyncWire:Codable {
         return SyncPairRequest(id:session.id,name:session.remoteName,code:String(format:"%06u",number),confirmed:confirmed)
     }
     @discardableResult private func sendEncrypted(_ message:SyncWire,session:SyncSession)->Bool {
-        guard let key=session.key,let bytes=try? JSONEncoder().encode(message),let box=try? AES.GCM.seal(bytes,using:key),let combined=box.combined else { return false }
-        return send(SyncWire(kind:"sealed",sealed:combined),session:session)
+        guard let remoteID=session.remoteID,session.transmitted<UInt64.max,let key=session.key,let bytes=try? JSONEncoder().encode(message) else { return false }
+        let counter=session.transmitted+1
+        guard let box=try? AES.GCM.seal(bytes,using:key,authenticating:Data("\(deviceID)|\(remoteID)|\(counter)".utf8)),let combined=box.combined else { return false }
+        session.transmitted=counter
+        return send(SyncWire(kind:"sealed",counter:counter,sealed:combined),session:session)
     }
     @discardableResult private func send(_ message:SyncWire,session:SyncSession)->Bool {
         guard let bytes=try? JSONEncoder().encode(message),bytes.count<=4*1024*1024 else { status="Too much history for one sync. No data was removed.";return false }
@@ -285,7 +295,7 @@ private struct SyncWire:Codable {
     }
     private func close(_ id:UUID) { guard let session=sessions.removeValue(forKey:id) else { return };session.timeout?.cancel();session.connection.stateUpdateHandler=nil;session.connection.cancel();requests.removeAll {$0.id==id} }
     private func persistJournal() {
-        do { try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true);let data=try JSONEncoder().encode(journal);try data.write(to:folder.appendingPathComponent("journal.json"),options:.atomic) }
+        do { try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true);let data=try JSONEncoder().encode(journal);try PrivateDataFile.write(data,to:folder.appendingPathComponent("journal.json")) }
         catch { status="Couldn’t save sync changes locally. "+error.localizedDescription }
     }
     private func persistPeers() { if let data=try? JSONEncoder().encode(paired) { defaults.set(data,forKey:"binge.sync.paired") } }
@@ -317,6 +327,8 @@ private struct SyncWire:Codable {
     let pairing:Bool
     let expectedID:String?
     let nonce=Data((0..<16).map {_ in UInt8.random(in:0...255)})
+    let ephemeral=Curve25519.KeyAgreement.PrivateKey()
+    var transmitted:UInt64=0;var received:UInt64=0
     var manual:Bool
     var sent:[String:[String:SyncStamp]]=[:]
     var key:SymmetricKey?

@@ -152,11 +152,13 @@ extension NativeMedia: @unchecked Sendable {}
                         while !Task.isCancelled {
                             let state=(try? JSONSerialization.jsonObject(with:Data(engine.snapshot().utf8))) as? [String:Any] ?? [:]
                             if let error=state["error"] as? String,!error.isEmpty { fail(error);return }
+                            #if DEBUG
                             if Date().timeIntervalSince(lastDiagnostic)>5 {
                                 let diagnostic="Media: \(converter.diagnostic())\nTorrent: \(engine.snapshot())\n"
                                 try? diagnostic.write(to:FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("startup-diagnostic.txt"),atomically:true,encoding:.utf8)
                                 lastDiagnostic=Date()
                             }
+                            #endif
                             let text=(try? String(contentsOf:playlist,encoding:.utf8)) ?? ""
                             let durations=text.components(separatedBy:"\n").filter { $0.hasPrefix("#EXTINF:") }.compactMap { Double($0.dropFirst(8).split(separator:",")[0]) }
                             let seconds=durations.reduce(0,+)
@@ -463,6 +465,7 @@ extension NativeMedia: @unchecked Sendable {}
         if let option=onlineSubtitles.first(where:{$0.id==saved.id}) ?? onlineSubtitles.first(where:{$0.lang==saved.lang}) { await selectOnlineSubtitle(option) }
     }
     private func fail(_ text:String,nativeError:Error?=nil) {
+        #if DEBUG
         let diagnostic="Failure: \(text)\nNative error: \(String(describing:nativeError))\nError log: \(String(describing:player?.currentItem?.errorLog()?.events))\nMedia: \(media?.diagnostic() ?? "direct")\nTorrent: \(engine.snapshot())\n"
         try? diagnostic.write(to:FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("playback-failure.txt"),atomically:true,encoding:.utf8)
         if ProcessInfo.processInfo.arguments.contains("--hail-check"),let cache {
@@ -474,6 +477,7 @@ extension NativeMedia: @unchecked Sendable {}
                 try? FileManager.default.copyItem(at:cache.appendingPathComponent("segments").appendingPathComponent(name),to:target)
             }
         }
+        #endif
         stop(discard:!ProcessInfo.processInfo.arguments.contains("--hail-check"));message=text;failed=true
     }
     func stop(discard:Bool=false,reusingTorrent:Bool=false) {

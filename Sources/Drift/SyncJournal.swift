@@ -61,7 +61,8 @@ struct SyncJournal:Codable,Sendable {
         var changed=false
         for (key,fields) in remote {
             guard key.count<=512,(history && key.hasPrefix("history|")) || (library && key.hasPrefix("library|")) else { continue }
-            for (name,value) in fields where name.count<=32 && (value.value?.count ?? 0)<=128*1024 {
+            guard entries[key] != nil || entries.count<20000 else { continue }
+            for (name,value) in fields where ["title","progress","watched","hidden","stream","member","favourite","status","added"].contains(name) && name.count<=32 && (value.value?.count ?? 0)<=128*1024 {
                 guard value.stamp.clock>=0,value.stamp.clock<Int64.max/2,value.stamp.author.count<=128 else { continue }
                 clock=max(clock,value.stamp.clock)
                 if entries[key]?[name].map({$0.stamp>=value.stamp}) == true { continue }

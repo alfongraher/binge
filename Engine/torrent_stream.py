@@ -54,6 +54,9 @@ def telemetry():
         except Exception: pass
 
 class Handler(BaseHTTPRequestHandler):
+    def setup(self):
+        super().setup()
+        self.connection.settimeout(10)
     def log_message(self, *_): pass
     def do_HEAD(self): self.serve(False)
     def do_GET(self): self.serve(True)
@@ -121,7 +124,26 @@ class Handler(BaseHTTPRequestHandler):
                 except (BrokenPipeError, ConnectionResetError): pass
         else: self.send_error(404)
 
-server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+class LimitedHTTPServer(ThreadingHTTPServer):
+    def __init__(self, *args, **kwargs):
+        self.slots = threading.BoundedSemaphore(32)
+        super().__init__(*args, **kwargs)
+    def process_request(self, request, address):
+        if not self.slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, address)
+        except BaseException:
+            self.slots.release()
+            raise
+    def process_request_thread(self, request, address):
+        try:
+            super().process_request_thread(request, address)
+        finally:
+            self.slots.release()
+
+server = LimitedHTTPServer(('127.0.0.1', 0), Handler)
 server.daemon_threads = True
 threading.Thread(target=server.serve_forever, daemon=True).start()
 base = f'http://127.0.0.1:{server.server_port}/{token}'
@@ -185,7 +207,7 @@ try:
             if time.monotonic() > file_deadline: raise RuntimeError('Could not create the torrent cache.')
         (root / 'hls').mkdir(exist_ok=True)
         status('buffering')
-        process = subprocess.Popen([config['ffmpeg'], '-hide_banner', '-nostdin', '-rw_timeout', '90000000', '-i', base + '/video'], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        process = subprocess.Popen([config['ffmpeg'], '-hide_banner', '-nostdin', '-rw_timeout', '90000000', '-protocol_whitelist', 'http,tcp', '-format_whitelist', 'matroska,webm,mov,mpegts,avi', '-i', base + '/video'], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         try: _, probe = process.communicate(timeout=120)
         except subprocess.TimeoutExpired:
             process.kill(); process.wait(); raise RuntimeError('Could not read video metadata. Try a source with more peers.')
@@ -217,7 +239,7 @@ try:
         # can disconnect the only useful peer before the new range is requested.
         status('buffering', bufferProgress=0, offset=start_position, generatedUntil=start_position, seekID=seek_id, generation=generation, ended=False, url=None)
         process = subprocess.Popen([config['ffmpeg'], '-hide_banner', '-loglevel', 'error', '-nostdin',
-            '-rw_timeout', '90000000', '-readrate', '6', *(['-noaccurate_seek', '-ss', str(start_position)] if start_position > 0 else []), '-i', base + '/video',
+            '-rw_timeout', '90000000', '-protocol_whitelist', 'http,tcp', '-format_whitelist', 'matroska,webm,mov,mpegts,avi', '-readrate', '6', *(['-noaccurate_seek', '-ss', str(start_position)] if start_position > 0 else []), '-i', base + '/video',
             '-map', '0:v:0', '-map', '0:a:0?', '-c:v', 'copy', *tag,
             '-af', 'aresample=async=1', '-avoid_negative_ts', 'make_zero', '-c:a', 'aac', '-b:a', '192k', '-ac', '2', '-sn',
             '-f', 'hls', '-hls_time', '4', '-hls_playlist_type', 'event', '-hls_segment_type', 'fmp4',

@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 struct AddonResource: Codable, Sendable {
     var name: String
@@ -118,7 +119,7 @@ struct AddonStream: Codable, Sendable {
         return "Unknown"
     }
     var playableSource: String? {
-        if let url, let parsed = URL(string: url), ["http", "https"].contains(parsed.scheme ?? ""), parsed.host != nil { return url }
+        if let url, let parsed = URL(string: url), AddonClient.allowedNetworkURL(parsed) { return url }
         guard let infoHash, infoHash.count == 40, infoHash.allSatisfy({ $0.isHexDigit }) else { return nil }
         var c = URLComponents(); c.scheme = "magnet"
         c.queryItems = [URLQueryItem(name: "xt", value: "urn:btih:\(infoHash)")]
@@ -140,12 +141,13 @@ struct FoundTitle: Identifiable, Sendable {
 }
 
 enum AddonError: Error, LocalizedError {
-    case invalidURL, response, data
+    case invalidURL, response, data, oversized
     var errorDescription: String? {
         switch self {
-        case .invalidURL: "Enter an HTTP(S) manifest.json URL without a query or fragment."
+        case .invalidURL: "Enter an HTTPS manifest.json URL without credentials, a query or fragment. Localhost HTTP is also supported."
         case .response: "The add-on did not return a successful response."
         case .data: "The add-on returned invalid or unsupported data."
+        case .oversized: "The add-on response is too large to load safely."
         }
     }
 }
@@ -155,14 +157,33 @@ struct AddonClient: Sendable {
         configuration.timeoutIntervalForRequest = 20
         configuration.timeoutIntervalForResource = 30
         configuration.httpMaximumConnectionsPerHost = 4
+        configuration.httpShouldSetCookies=false;configuration.httpCookieStorage=nil;configuration.urlCache=nil
         return URLSession(configuration: configuration)
     }()
     var session: URLSession = networkSession
     static func manifestURL(_ text: String) throws -> URL {
         guard let url = URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)),
-              ["http", "https"].contains(url.scheme ?? ""), url.host != nil,
+              Self.allowedNetworkURL(url),
               url.lastPathComponent == "manifest.json", url.query == nil, url.fragment == nil else { throw AddonError.invalidURL }
         return url
+    }
+    static func allowedNetworkURL(_ url:URL)->Bool {
+        guard url.user==nil,url.password==nil,let host=url.host,!host.isEmpty else { return false }
+        return url.scheme=="https" || (url.scheme=="http" && ["localhost","127.0.0.1","::1","[::1]"].contains(host.lowercased()))
+    }
+    func boundedData(_ request:URLRequest,limit:Int=8*1024*1024) async throws ->(Data,HTTPURLResponse) {
+        guard let url=request.url,Self.allowedNetworkURL(url) else { throw AddonError.invalidURL }
+        let (bytes,response)=try await session.bytes(for:request,delegate:SecureAddonRedirects.shared)
+        defer { bytes.task.cancel() }
+        guard let response=response as? HTTPURLResponse,let final=response.url,Self.allowedNetworkURL(final),(200..<300).contains(response.statusCode) else { throw AddonError.response }
+        guard response.expectedContentLength<=Int64(limit) else { throw AddonError.oversized }
+        var data=Data();data.reserveCapacity(Int(max(0,response.expectedContentLength)))
+        for try await byte in bytes {
+            guard data.count<limit else { throw AddonError.oversized }
+            data.append(byte)
+            if data.count%4096==0 { try Task.checkCancellation() }
+        }
+        try Task.checkCancellation();return (data,response)
     }
     static func endpoint(_ manifest: URL, components: [String]) -> URL {
         var result = manifest.deletingLastPathComponent()
@@ -172,9 +193,8 @@ struct AddonClient: Sendable {
     func fetch<T: Decodable & Sendable>(_ type: T.Type, url: URL) async throws -> T {
         var request = URLRequest(url: url); request.timeoutInterval = 20
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await session.data(for: request)
+        let (data, _) = try await boundedData(request)
         try Task.checkCancellation()
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw AddonError.response }
         do { return try JSONDecoder().decode(type, from: data) } catch { throw AddonError.data }
     }
     func install(_ text: String) async throws -> InstalledAddon {
@@ -250,5 +270,30 @@ enum CreditsTiming {
         guard position.isFinite,duration.isFinite,duration>0 else { return false }
         let window=min(duration*0.05,type=="movie" ? 180.0 : 60.0)
         return position>=duration-window
+    }
+}
+
+final class SecureAddonRedirects:NSObject,URLSessionTaskDelegate,@unchecked Sendable {
+    static let shared=SecureAddonRedirects()
+    func urlSession(_ session:URLSession,task:URLSessionTask,willPerformHTTPRedirection response:HTTPURLResponse,newRequest request:URLRequest,completionHandler:@escaping @Sendable (URLRequest?)->Void) {
+        guard let url=request.url,AddonClient.allowedNetworkURL(url),!(response.url?.scheme=="https" && url.scheme != "https") else { completionHandler(nil);return }
+        completionHandler(request)
+    }
+}
+
+/// Keep saved provider URLs and viewing preferences private to the local OS user.
+enum PrivateDataFile {
+    static func protectExisting(_ url:URL) throws {
+        if FileManager.default.fileExists(atPath:url.path) { try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:url.path) }
+    }
+    static func write(_ data:Data,to url:URL) throws {
+        try FileManager.default.createDirectory(at:url.deletingLastPathComponent(),withIntermediateDirectories:true)
+        let temporary=url.deletingLastPathComponent().appendingPathComponent(".binge-"+UUID().uuidString)
+        let descriptor=Darwin.open(temporary.path,O_WRONLY|O_CREAT|O_EXCL,0o600)
+        guard descriptor>=0 else { throw NSError(domain:NSPOSIXErrorDomain,code:Int(errno)) }
+        defer { try? FileManager.default.removeItem(at:temporary) }
+        let handle=FileHandle(fileDescriptor:descriptor,closeOnDealloc:true)
+        do { try handle.write(contentsOf:data);try handle.close() } catch {try? handle.close();throw error}
+        guard Darwin.rename(temporary.path,url.path)==0 else { throw NSError(domain:NSPOSIXErrorDomain,code:Int(errno)) }
     }
 }

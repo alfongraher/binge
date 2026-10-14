@@ -103,7 +103,9 @@ namespace lt = libtorrent;
 - (NSString *)selectedFilePath {
     if(!_client || !_handle.status().has_metadata)return nil;
     auto info=_handle.torrent_file();if(!info || _selected<0 || _selected>=info->num_files())return nil;
-    return [_cache stringByAppendingPathComponent:[NSString stringWithUTF8String:info->files().file_path(lt::file_index_t(_selected)).c_str()]];
+    NSString *base=[_cache stringByResolvingSymlinksInPath];
+    NSString *path=[[_cache stringByAppendingPathComponent:[NSString stringWithUTF8String:info->files().file_path(lt::file_index_t(_selected)).c_str()]] stringByResolvingSymlinksInPath];
+    return [path hasPrefix:[base stringByAppendingString:@"/"]] ? path : nil;
 }
 - (long long)videoSize {
     if(!_client || !_handle.status().has_metadata)return 0;
@@ -133,7 +135,7 @@ namespace lt = libtorrent;
         }
     }
     if(!available)return nil;
-    auto path=[_cache stringByAppendingPathComponent:[NSString stringWithUTF8String:files.file_path(lt::file_index_t(_selected)).c_str()]];
+    NSString *path=self.selectedFilePath;if(!path)return nil;
     NSFileHandle *file=[NSFileHandle fileHandleForReadingAtPath:path];if(!file)return nil;
     @try { [file seekToFileOffset:offset];NSData *data=[file readDataOfLength:length];[file closeFile];if(data.length==size_t(length)){_verifiedReads+=length;return data;} } @catch(NSException *exception) { [file closeFile]; }
     return nil;

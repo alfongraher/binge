@@ -34,6 +34,7 @@ struct LibraryItem:Identifiable,Codable {
     init(file:URL?=nil) {
         self.file=file ?? FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent("Drift/library.json")
         do {
+            try PrivateDataFile.protectExisting(self.file)
             try FileManager.default.createDirectory(at:self.file.deletingLastPathComponent(),withIntermediateDirectories:true)
             if FileManager.default.fileExists(atPath:self.file.path) { items=try JSONDecoder().decode([LibraryItem].self,from:Data(contentsOf:self.file)) }
         } catch { self.error="Could not load library: \(error.localizedDescription)" }
@@ -73,5 +74,5 @@ struct LibraryItem:Identifiable,Codable {
     @discardableResult func remove(_ item:LibraryItem)->Int? { guard let index=items.firstIndex(where:{$0.id==item.id}) else { return nil };items.remove(at:index);save();return index }
     func restore(_ item:LibraryItem,at index:Int) { guard !items.contains(where:{$0.id==item.id}) else { return };items.insert(item,at:min(max(0,index),items.count));save() }
     func applySyncedItems(_ values:[LibraryItem]) { items=values;save() }
-    private func save() { do { try JSONEncoder().encode(items).write(to:file,options:.atomic) } catch { self.error="Could not save library: \(error.localizedDescription)" } }
+    private func save() { do { try PrivateDataFile.write(JSONEncoder().encode(items),to:file) } catch { self.error="Could not save library: \(error.localizedDescription)" } }
 }

@@ -46,11 +46,10 @@ extension AddonClient {
         return try await fetch(Response.self, url: Self.endpoint(addon.manifestURL, components: ["subtitles", type, id + ".json"])).subtitles
     }
     func subtitleFile(_ option: SubtitleOption) async throws -> [SubtitleCue] {
-        guard ["https", "http"].contains(option.url.scheme ?? "") else { throw AddonError.data }
+        guard AddonClient.allowedNetworkURL(option.url) else { throw AddonError.data }
         var request = URLRequest(url: option.url); request.timeoutInterval = 20
-        let (data, response) = try await session.data(for: request)
+        let (data, _) = try await boundedData(request)
         try Task.checkCancellation()
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode), data.count <= 8 * 1024 * 1024 else { throw AddonError.response }
         guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .windowsCP1252) else { throw AddonError.data }
         let cues = SubtitleParser.parse(text)
         guard !cues.isEmpty else { throw AddonError.data }

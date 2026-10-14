@@ -33,6 +33,7 @@ final class WatchHistory: ObservableObject {
     init(file: URL? = nil) {
         self.file = file ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Drift/history.json")
         do {
+            try PrivateDataFile.protectExisting(self.file)
             if FileManager.default.fileExists(atPath: self.file.path) { records = try JSONDecoder().decode([WatchRecord].self, from: Data(contentsOf: self.file)) }
         } catch { self.error = "Could not load viewing history." }
     }
@@ -106,7 +107,7 @@ final class WatchHistory: ObservableObject {
     private func save() {
         do {
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try JSONEncoder().encode(records).write(to: file, options: .atomic)
+            try PrivateDataFile.write(JSONEncoder().encode(records),to:file)
         } catch { self.error = "Could not save viewing history." }
     }
 }

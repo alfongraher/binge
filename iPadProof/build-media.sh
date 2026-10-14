@@ -2,12 +2,12 @@
 set -euo pipefail
 cd "${0:A:h}"
 root="$PWD"
-mkdir -p build-media/install /private/tmp/binge-ipad-ffmpeg
-if [[ ! -d /private/tmp/binge-ipad-ffmpeg/source ]]; then cp -R vendor/ffmpeg-8.0 /private/tmp/binge-ipad-ffmpeg/source; fi
-mkdir -p /private/tmp/binge-ipad-ffmpeg/build
-cd /private/tmp/binge-ipad-ffmpeg/build
+mkdir -p build-media/install /private/tmp/binge-ipad-ffmpeg-8.0.3
+if [[ ! -d /private/tmp/binge-ipad-ffmpeg-8.0.3/source ]]; then cp -R vendor/ffmpeg-8.0.3 /private/tmp/binge-ipad-ffmpeg-8.0.3/source; fi
+mkdir -p /private/tmp/binge-ipad-ffmpeg-8.0.3/build
+cd /private/tmp/binge-ipad-ffmpeg-8.0.3/build
 sdk=$(xcrun --sdk iphoneos --show-sdk-path)
-../source/configure --prefix="/private/tmp/binge-ipad-ffmpeg/install" \
+../source/configure --prefix="/private/tmp/binge-ipad-ffmpeg-8.0.3/install" \
  --target-os=darwin --arch=aarch64 --enable-cross-compile --cc="$(xcrun --find clang)" --ar="$(xcrun --find ar)" --ranlib="$(xcrun --find ranlib)" \
  --sysroot="$sdk" --extra-cflags='-target arm64-apple-ios17.0 -fPIC' --extra-ldflags='-target arm64-apple-ios17.0' \
  --disable-everything --disable-autodetect --disable-programs --disable-doc --disable-debug --disable-asm \
@@ -20,5 +20,5 @@ rg -q '^#define CONFIG_SUBRIP_DECODER 1$' config_components.h
 make -j4
 make install
 
-cp -R /private/tmp/binge-ipad-ffmpeg/install/include "$root/build-media/install/"
-cp -R /private/tmp/binge-ipad-ffmpeg/install/lib "$root/build-media/install/"
+cp -R /private/tmp/binge-ipad-ffmpeg-8.0.3/install/include "$root/build-media/install/"
+cp -R /private/tmp/binge-ipad-ffmpeg-8.0.3/install/lib "$root/build-media/install/"

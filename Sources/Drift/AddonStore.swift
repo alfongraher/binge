@@ -17,6 +17,7 @@ final class AddonStore: ObservableObject {
         file=FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent("Drift/addons.json")
         #endif
         do {
+            try PrivateDataFile.protectExisting(self.file)
             if FileManager.default.fileExists(atPath: file.path) {
                 addons = try JSONDecoder().decode([InstalledAddon].self, from: Data(contentsOf: file))
             }
@@ -72,7 +73,7 @@ final class AddonStore: ObservableObject {
     private func save() {
         do {
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try JSONEncoder().encode(addons).write(to: file, options: .atomic)
+            try PrivateDataFile.write(JSONEncoder().encode(addons),to:file)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
         } catch { self.error = "Could not save add-ons." }
     }

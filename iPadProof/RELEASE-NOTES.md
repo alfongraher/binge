@@ -1,3 +1,9 @@
+## Security update · 0.4.2 (11) · October 13, 2026
+
+Patched FFmpeg 8.0.3 on both platforms; limited and protected add-on/subtitle downloads; hardened encrypted sync with fresh key agreement, direction binding and replay protection; bounded loopback server connections and protected local saved data. Detailed production playback diagnostic files are no longer written. See docs/SECURITY-REVIEW.md for findings, tests and limits.
+
+Update both devices together for sync. Existing pairings remain stored. Remote HTTP-only providers/direct sources must use HTTPS; explicit localhost providers remain supported.
+
 ## Public Beta 1 correction · October 13, 2026
 
 Mac Continue Watching and Library cards hide the native menu indicator, leaving only the ellipsis. iPad Explore page requests are no longer tied to the loading indicator's view task, which cancelled its own request when busy changed. Cancellation is ignored rather than displayed as a network failure; generation checks still discard obsolete results after filters change. Corrected installer: `releases/binge-0.4.1-public-beta1-pagination-fix.ipa` (original installer retained).

@@ -15,7 +15,7 @@ add('SRC','isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (BS
 add('FW','isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (BL); runOnlyForDeploymentPostprocessing = 0;')
 add('RES','isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (BR,BIC); runOnlyForDeploymentPostprocessing = 0;')
 settings={
- 'PRODUCT_NAME':'binge','MARKETING_VERSION':'0.4.1','CURRENT_PROJECT_VERSION':'10','INFOPLIST_KEY_CFBundleDisplayName':'binge','ASSETCATALOG_COMPILER_APPICON_NAME':'AppIcon','PRODUCT_BUNDLE_IDENTIFIER':'local.binge.torrentproof', 'SDKROOT':'iphoneos','IPHONEOS_DEPLOYMENT_TARGET':'17.0','TARGETED_DEVICE_FAMILY':'2',
+ 'PRODUCT_NAME':'binge','MARKETING_VERSION':'0.4.2','CURRENT_PROJECT_VERSION':'11','INFOPLIST_KEY_CFBundleDisplayName':'binge','ASSETCATALOG_COMPILER_APPICON_NAME':'AppIcon','PRODUCT_BUNDLE_IDENTIFIER':'local.binge.torrentproof', 'SDKROOT':'iphoneos','IPHONEOS_DEPLOYMENT_TARGET':'17.0','TARGETED_DEVICE_FAMILY':'2',
  'SWIFT_VERSION':'6.0','CLANG_CXX_LANGUAGE_STANDARD':'c++17','CLANG_CXX_LIBRARY':'libc++','CLANG_ENABLE_MODULES':'YES','CLANG_ENABLE_OBJC_ARC':'YES',
  'GENERATE_INFOPLIST_FILE':'YES','INFOPLIST_KEY_UIApplicationSceneManifest_Generation':'YES','INFOPLIST_KEY_UILaunchScreen_Generation':'YES','INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad':'UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown',
  'INFOPLIST_FILE':'App/Info.plist',
