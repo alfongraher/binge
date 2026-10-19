@@ -6,7 +6,8 @@ typealias ViewState<Value> = SwiftUI.State<Value>
     var body:some Scene {
         WindowGroup {
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--hail-format-check") { IPadHailFormatProof() }
+            if ProcessInfo.processInfo.arguments.contains("--navigation-check") { IPadNavigationProof() }
+            else if ProcessInfo.processInfo.arguments.contains("--hail-format-check") { IPadHailFormatProof() }
             else if ProcessInfo.processInfo.arguments.contains("--mac-reference-check") { IPadMacReferenceProof() }
             else if ProcessInfo.processInfo.arguments.contains("--hail-check") || ProcessInfo.processInfo.arguments.contains("--real-source-check") || ProcessInfo.processInfo.arguments.contains("--real-mp4-check") { IPadRealSourceProof() }
             else if ProcessInfo.processInfo.arguments.contains("--seek-check") { IPadSeekProof() }
@@ -558,5 +559,39 @@ struct IPadHailFormatProof:View {
             try? report.write(to:FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("hail-format-result.txt"),atomically:true,encoding:.utf8)
         }.onDisappear { player?.pause();loader?.cancel() }
     }
+}
+#endif
+
+#if DEBUG
+struct IPadNavigationProof:View {
+    @StateObject private var session:IPadPlayback
+    @State private var report="Checking playback exit responsiveness…"
+    init() {
+        let defaults=UserDefaults(suiteName:"binge.ipad.navigation-proof")!
+        defaults.removePersistentDomain(forName:"binge.ipad.navigation-proof")
+        let store=IPadCacheStore(root:FileManager.default.urls(for:.cachesDirectory,in:.userDomainMask)[0].appendingPathComponent("binge-navigation-proof"))
+        _session=StateObject(wrappedValue:IPadPlayback(history:IPadHistory(defaults:defaults),preferences:defaults,cacheStore:store))
+    }
+    var body:some View {
+        VStack { if let player=session.player { ProofVideoView(player:player).frame(minHeight:250) };Text(report) }.padding(30)
+        .task {
+            var times:[Double]=[]
+            for cycle in 1...3 {
+                session.start(AddonStream(name:"Navigation fixture",infoHash:String(repeating:"0",count:40),fileIdx:1),fixture:Bundle.main.resourceURL!.appendingPathComponent("Fixture/Audio"))
+                let deadline=Date().addingTimeInterval(90)
+                while !Task.isCancelled && !session.failed && session.position<1.5 && Date()<deadline {try? await Task.sleep(for:.milliseconds(200))}
+                guard !Task.isCancelled,!session.failed,session.position>=1.5 else { report="FAILED: cycle \(cycle) playback · \(session.message)";save();return }
+                let start=ProcessInfo.processInfo.systemUptime
+                session.stop(discard:true)
+                times.append((ProcessInfo.processInfo.systemUptime-start)*1000)
+                report="Cycle \(cycle): exit \(times.last!) ms"
+                save()
+                try? await Task.sleep(for:.milliseconds(400))
+            }
+            report=(times.max() ?? 1000)<500 ? "PASS: three native playback/start/exit cycles; stop milliseconds \(times)" : "FAILED: exit exceeded 500 ms · \(times)"
+            save()
+        }
+    }
+    private func save() { try? report.write(to:FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("navigation-proof-result.txt"),atomically:true,encoding:.utf8) }
 }
 #endif

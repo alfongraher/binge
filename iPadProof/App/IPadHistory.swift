@@ -11,13 +11,14 @@ struct IPadWatchContext: Codable, Sendable {
     var season:Int?
     var episode:Int?
     var genres:[String]?
+    var estimatedDuration:Double?
     var background:URL?
     var thumbnail:URL?
     var displayName:String { episodeLabel.map { name + " · " + $0 } ?? name }
     init(title:CatalogTitle,episode:CatalogTitle.Episode?=nil) {
         titleID=title.id;type=title.type;contentID=episode?.id ?? title.id
         name=title.name;poster=title.poster;episodeLabel=episode?.label;season=episode?.season;self.episode=episode?.episode
-        genres=title.genres
+        genres=title.genres;estimatedDuration=title.estimatedDuration
         background=title.background;thumbnail=episode?.thumbnail
     }
 }

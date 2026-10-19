@@ -183,12 +183,14 @@ struct IPadTitleView:View {
                 }
                 if findingSources { ProgressView("Finding sources…") }
                 if !streams.isEmpty {
-                    Text("Choose a source under 2 GB. H.264/HEVC video is supported; common movie audio is prepared automatically. MKV starts after a short buffer.").font(.caption).foregroundStyle(.secondary)
+                    Text("Choose a source under 2 GB. Recommendations balance recent transfer speed, stability, reported peers and file size. They improve as you watch.").font(.caption).foregroundStyle(.secondary)
                     Picker("Resolution",selection:$resolution) { ForEach(["All","4K","1080p","720p","SD","Unknown"],id:\.self) { Text($0).tag($0) } }.pickerStyle(.segmented)
+                    LazyVStack(spacing:12) {
                     ForEach(streams.filter { resolution=="All" || $0.stream.resolution==resolution }) { source in
                         NavigationLink { IPadPlaybackView(stream:source.stream,title:title.name,context:IPadWatchContext(title:title)) } label: {
-                            HStack(alignment:.top) { VStack(alignment:.leading,spacing:6) { Text(source.stream.name ?? source.addonName).font(.headline);Text(source.stream.detail).font(.caption).foregroundStyle(.secondary).lineLimit(4) };Spacer();Image(systemName:"play.circle.fill").font(.title2).foregroundStyle(.yellow) }.padding(16).background(.white.opacity(0.04),in:RoundedRectangle(cornerRadius:14))
+                            HStack(alignment:.top) { VStack(alignment:.leading,spacing:6) { Text(source.stream.name ?? source.addonName).font(.headline);if source.id==streams.first(where:{SourcePolicy.recommendable($0.stream,maxBytes:2*1024*1024*1024) && (resolution=="All" || $0.stream.resolution==resolution)})?.id { Label("Recommended",systemImage:"sparkles").font(.caption.weight(.semibold)).foregroundStyle(.yellow) };Text(source.stream.detail).font(.caption).foregroundStyle(.secondary).lineLimit(4) };Spacer();Image(systemName:"play.circle.fill").font(.title2).foregroundStyle(.yellow) }.padding(16).background(.white.opacity(0.04),in:RoundedRectangle(cornerRadius:14))
                         }.buttonStyle(.plain)
+                    }
                     }
                 }
             }.padding(24)
@@ -211,7 +213,8 @@ struct IPadTitleView:View {
         findingSources=true;streams=[];error=nil;defer { if sourceRequest==request { findingSources=false } }
         do {
             let foundSources=try await AddonStore.shared.readyStreams(type:found.title.type,id:id)
-            try Task.checkCancellation();guard sourceRequest==request else { return };streams=IPadSourceOrder.sorted(foundSources.filter { $0.stream.playableSource != nil })
+            try Task.checkCancellation();guard sourceRequest==request else { return };let ranked=await SourcePolicy.orderedAsync(foundSources.filter {$0.stream.playableSource != nil},profile:SourceExperience.shared.profile,duration:(detail ?? found.title).estimatedDuration,maxBytes:2*1024*1024*1024)
+            try Task.checkCancellation();guard sourceRequest==request else {return};streams=ranked
             if streams.isEmpty { error="No playable sources found for this title." }
         } catch { if !Task.isCancelled && sourceRequest==request { self.error=error.localizedDescription } }
     }
@@ -227,15 +230,15 @@ struct IPadEpisodeSources:View {
     @ViewState<String> private var resolution="All"
     var body:some View {
         ScrollView {
-            VStack(alignment:.leading,spacing:18) {
+            LazyVStack(alignment:.leading,spacing:18) {
                 if busy { ProgressView("Finding sources…").frame(maxWidth:.infinity).padding(32) }
                 if let error { Text(error).foregroundStyle(.secondary);Button("Try again") { Task { await load() } } }
                 if !sources.isEmpty {
-                    Text("Choose a source under 2 GB. H.264/HEVC video is supported; common movie audio is prepared automatically. MKV starts after a short buffer.").font(.caption).foregroundStyle(.secondary)
+                    Text("Choose a source under 2 GB. Recommendations balance recent transfer speed, stability, reported peers and file size. They improve as you watch.").font(.caption).foregroundStyle(.secondary)
                     Picker("Resolution",selection:$resolution) { ForEach(["All","4K","1080p","720p","SD","Unknown"],id:\.self) { Text($0).tag($0) } }.pickerStyle(.segmented)
                     ForEach(sources.filter { resolution=="All" || $0.stream.resolution==resolution }) { source in
                         NavigationLink { IPadPlaybackView(stream:source.stream,title:title,context:watchContext) } label: {
-                            HStack(alignment:.top) { VStack(alignment:.leading,spacing:6) { Text(source.stream.name ?? source.addonName).font(.headline);Text(source.stream.detail).font(.caption).foregroundStyle(.secondary).lineLimit(5) };Spacer();Image(systemName:"play.circle.fill").font(.title2).foregroundStyle(.yellow) }.padding(16).background(.white.opacity(0.04),in:RoundedRectangle(cornerRadius:14))
+                            HStack(alignment:.top) { VStack(alignment:.leading,spacing:6) { Text(source.stream.name ?? source.addonName).font(.headline);if source.id==sources.first(where:{SourcePolicy.recommendable($0.stream,maxBytes:2*1024*1024*1024) && (resolution=="All" || $0.stream.resolution==resolution)})?.id { Label("Recommended",systemImage:"sparkles").font(.caption.weight(.semibold)).foregroundStyle(.yellow) };Text(source.stream.detail).font(.caption).foregroundStyle(.secondary).lineLimit(5) };Spacer();Image(systemName:"play.circle.fill").font(.title2).foregroundStyle(.yellow) }.padding(16).background(.white.opacity(0.04),in:RoundedRectangle(cornerRadius:14))
                         }.buttonStyle(.plain)
                     }
                     if !sources.contains(where:{resolution=="All" || $0.stream.resolution==resolution}) { Text("No sources match this resolution.").foregroundStyle(.secondary) }
@@ -247,7 +250,8 @@ struct IPadEpisodeSources:View {
         busy=true;error=nil;defer { busy=false }
         do {
             let result=try await AddonStore.shared.readyStreams(type:type,id:contentID)
-            try Task.checkCancellation();sources=IPadSourceOrder.sorted(result.filter {$0.stream.playableSource != nil})
+            try Task.checkCancellation();let ranked=await SourcePolicy.orderedAsync(result.filter {$0.stream.playableSource != nil},profile:SourceExperience.shared.profile,duration:watchContext?.estimatedDuration ?? (type=="movie" ? 5400 : 2700),maxBytes:2*1024*1024*1024)
+            try Task.checkCancellation();sources=ranked
             if sources.isEmpty { error="No playable sources were returned for this episode." }
             let report:[String:Any]=["id":contentID,"count":sources.count,"type":type]
             if let data=try? JSONSerialization.data(withJSONObject:report) { try? data.write(to:FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("episode-sources-result.json")) }
@@ -256,16 +260,8 @@ struct IPadEpisodeSources:View {
 }
 
 enum IPadSourceOrder {
-    static func sorted(_ sources:[ListedStream])->[ListedStream] {
-        sources.enumerated().sorted {
-            func rank(_ stream:AddonStream)->Int {
-                if stream.detail.lowercased().contains("av1") { return 3 }
-                if let size=SourcePolicy.bytes(stream),size>2*1024*1024*1024 { return 2 }
-                return SourcePolicy.bytes(stream)==nil ? 1 : 0
-            }
-            let a=rank($0.element.stream),b=rank($1.element.stream)
-            return a==b ? $0.offset<$1.offset : a<b
-        }.map(\.element)
+    @MainActor static func sorted(_ sources:[ListedStream])->[ListedStream] {
+        SourcePolicy.ordered(sources,profile:SourceExperience.shared.profile,duration:2700,maxBytes:2*1024*1024*1024)
     }
 }
 
@@ -577,9 +573,9 @@ private struct IPadFeaturedPage:View {
         GeometryReader { geo in
             ZStack(alignment:.bottomLeading) {
                 AsyncImage(url:found.title.background ?? found.title.poster) { image in
-                    image.resizable().scaledToFill()
+                    image.resizable().scaledToFit().mask(LinearGradient(stops:[.init(color:.clear,location:0),.init(color:.black,location:0.2),.init(color:.black,location:1)],startPoint:.leading,endPoint:.trailing))
                 } placeholder: { Color.white.opacity(0.04) }
-                .frame(width:geo.size.width,height:geo.size.height).clipped()
+                .frame(width:geo.size.width,height:geo.size.height,alignment:.trailing).background(Color.black).clipped()
                 LinearGradient(colors:[.black.opacity(0.8),.black.opacity(0.3),.clear],startPoint:.leading,endPoint:.trailing)
                 LinearGradient(colors:[.clear,.black.opacity(0.92)],startPoint:.top,endPoint:.bottom)
                 VStack(alignment:.leading,spacing:14) {

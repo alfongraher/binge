@@ -6,6 +6,8 @@ final class PlaybackSession: ObservableObject {
     static let shared = PlaybackSession()
     private var lastControlWrite = Date.distantPast
     private var retained = false
+    private var sourceStarted=Date()
+    private var recordedStartup=false
     private var sourceKey: String?
     @Published var finished = false
     private var endObserver: NSObjectProtocol?
@@ -57,6 +59,7 @@ final class PlaybackSession: ObservableObject {
     func start(_ selection: PlaybackSelection, warmOnly: Bool = false) {
         let key = (selection.stream.playableSource ?? "") + ":" + String(selection.stream.fileIdx ?? -1)
         if sourceKey == key, player != nil, !failed, !finished { retained = false; wantsPause = false; paused = false; player?.play(); control(paused: false, force: true); if !selection.automaticSources.isEmpty { monitorSources(selection) }; return }
+        sourceStarted=Date();recordedStartup=false
         if !warmOnly, worker != nil, scratch != nil,
            let hash = selection.stream.infoHash, hash == currentStream?.infoHash,
            let index = selection.stream.fileIdx, index != workerFileIdx {
@@ -118,6 +121,7 @@ final class PlaybackSession: ObservableObject {
                         self.bufferProgress = status.bufferProgress.map { min(1, max(0, $0)) }
                         if let duration = status.duration, duration.isFinite { self.duration = duration }
                         self.peers = status.peers ?? 0; self.rate = status.rate ?? 0
+                        if !self.retained { SourceExperience.shared.observe(rate:Double(self.rate)) }
                         if status.state == "ready", self.player == nil, let text = status.url, let url = URL(string: text) { self.preparedURL = url; self.message = "Opening your video…"; self.play(url) }
                         else if status.state == "buffering" { self.message = "Buffering your video…" }
                         else if status.state == "error" { self.fail(status.message ?? "Torrent playback failed."); return }
@@ -194,6 +198,9 @@ final class PlaybackSession: ObservableObject {
                     self.previousClock = clock; self.lastClockMovement = Date(); self.recovering = false
                 }
                 if self.wantsPause || !self.readyToPlay { self.lastClockMovement = Date() }
+                if !self.recordedStartup,!self.warmOnly,self.readyToPlay,player.timeControlStatus == .playing,self.position>0.5,let source=self.currentStream {
+                    self.recordedStartup=true;SourceExperience.shared.record(source,success:true,startup:Date().timeIntervalSince(self.sourceStarted))
+                }
                 let stalled = Date().timeIntervalSince(self.lastClockMovement)
                 self.recovering = !self.wantsPause && self.readyToPlay && stalled >= 8
                 self.control(paused: self.wantsPause)
@@ -342,7 +349,7 @@ final class PlaybackSession: ObservableObject {
         control(paused: wantsPause, force: true)
     }
 
-    private func fail(_ text: String) { stop(); failed = true; message = text }
+    private func fail(_ text: String) { if !recordedStartup,!warmOnly,let currentStream { SourceExperience.shared.record(currentStream,success:false);recordedStartup=true };stop(); failed = true; message = text }
     private func control(paused: Bool, force: Bool = false) {
         guard force || Date().timeIntervalSince(lastControlWrite) >= 2 else { return }
         lastControlWrite = Date()
@@ -368,7 +375,7 @@ final class PlaybackSession: ObservableObject {
                 process.waitUntilExit()
                 if let directory { try? FileManager.default.removeItem(at: directory) }
             }
-        } else if let scratch { try? FileManager.default.removeItem(at: scratch) }
+        } else if let scratch { Task.detached { try? FileManager.default.removeItem(at:scratch) } }
         worker = nil; scratch = nil
     }
 }

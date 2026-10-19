@@ -157,7 +157,7 @@ struct DiscoverView: View {
             HStack { Text("Available sources").font(.headline); Spacer(); if busy { ProgressView().controlSize(.small) } else { Text("\(filteredStreams.count) of \(streams.count)").foregroundStyle(.secondary) } }
             if !streams.isEmpty {
                 Button("Watch automatically", systemImage: "sparkles") {
-                    let candidates = SourcePolicy.ranked(streams.map(\.stream), throughput: UserDefaults.standard.double(forKey: "torrentThroughput"), duration: found.title.type == "movie" ? 5400 : 2700)
+                    let candidates = filteredStreams.filter {SourcePolicy.eligible($0.stream)}.map(\.stream)
                     if let source = candidates.first {
                         let episode = episodes.first { $0.id == videoID }
                         playback = PlaybackSelection(title: found.title.name + (episode.map { " · \($0.label)" } ?? ""), stream: source, poster: found.title.poster, contentID: found.title.type == "movie" ? found.title.id : videoID, contentType: found.title.type, genres: found.title.genres ?? [], episodes: episodes, seriesTitle: found.title.name, automaticSources: candidates)
@@ -177,6 +177,7 @@ struct DiscoverView: View {
                         HStack(alignment: .top) {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(listed.stream.name ?? listed.addonName).font(.headline)
+                                if listed.id==filteredStreams.first(where:{SourcePolicy.recommendable($0.stream)})?.id { Label("Recommended",systemImage:"sparkles").font(.caption.weight(.semibold)).foregroundStyle(DriftTheme.accent) }
                                 Text(listed.stream.detail).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
                                 Text(listed.addonName).font(.caption).foregroundStyle(.tertiary)
                             }
@@ -295,7 +296,10 @@ struct DiscoverView: View {
                 catch { if Task.isCancelled { return }; errors.append("\(addon.manifest.name): source request failed.") }
             }
             guard !Task.isCancelled else { return }
-            streams = results; failures = errors
+            let profile=SourceExperience.shared.profile
+            let ordered=await SourcePolicy.orderedAsync(results,profile:profile,duration:found.title.estimatedDuration)
+            guard !Task.isCancelled else {return}
+            streams = ordered; failures = errors
             if addons.isEmpty { failures = ["No installed stream add-on supports this title."] }
             else if results.isEmpty && errors.isEmpty { failures = ["No sources returned for this title."] }
             busy = false

@@ -1,4 +1,5 @@
-import json,shlex,os
+import os
+import json,shlex
 from pathlib import Path
 root=Path(__file__).resolve().parent
 command=json.loads((root/'build-engine/compile_commands.json').read_text())[0]['command']
@@ -15,11 +16,11 @@ add('SRC','isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (BS
 add('FW','isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (BL); runOnlyForDeploymentPostprocessing = 0;')
 add('RES','isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (BR,BIC); runOnlyForDeploymentPostprocessing = 0;')
 settings={
- 'PRODUCT_NAME':'binge','MARKETING_VERSION':'0.4.2','CURRENT_PROJECT_VERSION':'11','INFOPLIST_KEY_CFBundleDisplayName':'binge','ASSETCATALOG_COMPILER_APPICON_NAME':'AppIcon','PRODUCT_BUNDLE_IDENTIFIER':'local.binge.torrentproof', 'SDKROOT':'iphoneos','IPHONEOS_DEPLOYMENT_TARGET':'17.0','TARGETED_DEVICE_FAMILY':'2',
+ 'PRODUCT_NAME':'binge','MARKETING_VERSION':'0.4.3','CURRENT_PROJECT_VERSION':'12','INFOPLIST_KEY_CFBundleDisplayName':'binge','ASSETCATALOG_COMPILER_APPICON_NAME':'AppIcon','PRODUCT_BUNDLE_IDENTIFIER':'local.binge.torrentproof', 'SDKROOT':'iphoneos','IPHONEOS_DEPLOYMENT_TARGET':'17.0','TARGETED_DEVICE_FAMILY':'2',
  'SWIFT_VERSION':'6.0','CLANG_CXX_LANGUAGE_STANDARD':'c++17','CLANG_CXX_LIBRARY':'libc++','CLANG_ENABLE_MODULES':'YES','CLANG_ENABLE_OBJC_ARC':'YES',
  'GENERATE_INFOPLIST_FILE':'YES','INFOPLIST_KEY_UIApplicationSceneManifest_Generation':'YES','INFOPLIST_KEY_UILaunchScreen_Generation':'YES','INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad':'UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown',
  'INFOPLIST_FILE':'App/Info.plist',
- 'SWIFT_OBJC_BRIDGING_HEADER':'$(SRCROOT)/App/Bridge.h','CODE_SIGN_STYLE':'Automatic','DEVELOPMENT_TEAM':os.environ.get('BINGE_DEVELOPMENT_TEAM',''),'ENABLE_USER_SCRIPT_SANDBOXING':'YES',
+ 'SWIFT_OBJC_BRIDGING_HEADER':'$(SRCROOT)/App/Bridge.h','CODE_SIGN_STYLE':'Automatic','DEVELOPMENT_TEAM':os.environ.get('BINGE_DEVELOPMENT_TEAM', ''),'ENABLE_USER_SCRIPT_SANDBOXING':'YES',
  'LIBRARY_SEARCH_PATHS':['$(inherited)','$(SRCROOT)/build-engine','$(SRCROOT)/build-media/install/lib'],
  'HEADER_SEARCH_PATHS':['$(inherited)','$(SRCROOT)/vendor/libtorrent-rasterbar-2.0.15/include','$(SRCROOT)/vendor/boost_1_86_0','$(SRCROOT)/build-media/install/include'],
  'GCC_PREPROCESSOR_DEFINITIONS':['$(inherited)']+defines,'OTHER_LDFLAGS':['$(inherited)','-lc++','-framework','SystemConfiguration','-lavformat','-lavcodec','-lswresample','-lavutil','-lz','-liconv'],

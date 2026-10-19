@@ -74,6 +74,8 @@ struct CatalogTitle: Decodable, Identifiable, Sendable {
     var logo: URL?
     var trailers: [Trailer]?
     var trailerStreams: [TrailerStream]?
+    var runtime:CatalogRuntime?
+    var estimatedDuration:Double { runtime?.seconds ?? (type=="movie" ? 5400 : 2700) }
     struct Trailer: Decodable, Sendable { var source: String?; var type: String? }
     struct TrailerStream: Decodable, Sendable { var ytId: String? }
     var trailerURL: URL? {
@@ -295,5 +297,28 @@ enum PrivateDataFile {
         let handle=FileHandle(fileDescriptor:descriptor,closeOnDealloc:true)
         do { try handle.write(contentsOf:data);try handle.close() } catch {try? handle.close();throw error}
         guard Darwin.rename(temporary.path,url.path)==0 else { throw NSError(domain:NSPOSIXErrorDomain,code:Int(errno)) }
+    }
+}
+
+struct CatalogRuntime:Decodable,Sendable {
+    let seconds:Double?
+    init(from decoder:Decoder) throws {
+        let container=try decoder.singleValueContainer()
+        let text:String
+        if let string=try? container.decode(String.self) {text=string}
+        else if let number=try? container.decode(Double.self) {text=String(number)}
+        else {text=""}
+        func unit(_ pattern:String)->Double? {
+            guard let regex=try? NSRegularExpression(pattern:pattern,options:.caseInsensitive),let match=regex.firstMatch(in:text,range:NSRange(text.startIndex...,in:text)),let range=Range(match.range(at:1),in:text) else {return nil}
+            return Double(text[range])
+        }
+        let hours=unit("([0-9]+(?:\\.[0-9]+)?)\\s*h")
+        let minutes=unit("([0-9]+(?:\\.[0-9]+)?)\\s*m")
+        let numeric=Double(text.trimmingCharacters(in:.whitespacesAndNewlines))
+        let value:Double
+        if let hours {value=hours*3600+(minutes ?? 0)*60}
+        else if let minutes=minutes ?? numeric {value=minutes*60}
+        else {value=0}
+        seconds=value.isFinite && value>0 && value<=86400 ? value : nil
     }
 }

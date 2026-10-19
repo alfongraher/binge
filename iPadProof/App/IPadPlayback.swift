@@ -11,6 +11,8 @@ extension NativeMedia: @unchecked Sendable {}
     @Published var duration=0.0
     @Published private(set) var bufferedRanges:[ClosedRange<Double>]=[]
     @Published private(set) var isPlaying=false
+    private var sourceStarted=Date()
+    private var recordedStartup=false
     @Published var completed=false
     @Published var seekError:String?
     @Published private(set) var nextEpisode:IPadWatchContext?
@@ -66,6 +68,7 @@ extension NativeMedia: @unchecked Sendable {}
     private var mediaFinished=false
     func start(_ stream:AddonStream,context:IPadWatchContext?=nil,fixture:URL?=nil,reusingTorrent:Bool=false,resumeAt:Double?=nil,autoplay:Bool=true) {
         stop(reusingTorrent:reusingTorrent);self.fixture=fixture;generation=UUID();onlineSubtitles=[];subtitleError=nil;onlineCues=nil;onlineOption=nil;self.context=context;self.stream=stream;failed=false;progress=0;position=0;duration=0;completed=false;bufferedRanges=[];isPlaying=false;baseTime=0;lastSave = .distantPast
+        sourceStarted=Date();recordedStartup=false
         resumePosition=resumeAt ?? context.flatMap { history.record($0)?.position } ?? 0
         message=resumePosition>0 ? "Resuming your video…" : "Preparing your video…"
         subtitleDelay=preferences.double(forKey:"binge.ipad.subtitleDelay")
@@ -123,7 +126,7 @@ extension NativeMedia: @unchecked Sendable {}
                     if let error=state["error"] as? String,!error.isEmpty { fail(error);return }
                     if state["metadata"] as? Bool == true,let path=engine.selectedFilePath() {
                         let size=engine.videoSize()
-                        guard size>0 && size<=2*1024*1024*1024 else { fail("Choose a source smaller than 2 GB for this iPad prototype.");return }
+                        guard size>0 && size<=2*1024*1024*1024 else { fail("Choose a source smaller than 2 GB for this iPad.");return }
                         let capacity=try? cache.resourceValues(forKeys:[.volumeAvailableCapacityForImportantUsageKey]).volumeAvailableCapacityForImportantUsage
                         if let capacity,capacity<size*2+250*1024*1024 { fail("Not enough free space for this source. Choose a smaller file.");return }
                         let output=cache.appendingPathComponent("segments")
@@ -151,6 +154,7 @@ extension NativeMedia: @unchecked Sendable {}
                         var lastDiagnostic=Date.distantPast
                         while !Task.isCancelled {
                             let state=(try? JSONSerialization.jsonObject(with:Data(engine.snapshot().utf8))) as? [String:Any] ?? [:]
+                            if fixture==nil { SourceExperience.shared.observe(rate:Double(state["rate"] as? Int ?? 0)) }
                             if let error=state["error"] as? String,!error.isEmpty { fail(error);return }
                             #if DEBUG
                             if Date().timeIntervalSince(lastDiagnostic)>5 {
@@ -241,6 +245,13 @@ extension NativeMedia: @unchecked Sendable {}
             Task { @MainActor [weak self] in
                 guard let self,self.player === video,!self.resumeSeeking,time.seconds.isFinite else { return }
                 self.position=max(0,self.baseTime+time.seconds)
+                if !self.recordedStartup,self.fixture==nil,time.seconds>0.5,video.timeControlStatus == .playing,let stream=self.stream {
+                    self.recordedStartup=true;SourceExperience.shared.record(stream,success:true,startup:Date().timeIntervalSince(self.sourceStarted))
+                }
+                if self.fixture==nil,self.engine.videoSize()>0 {
+                    let snapshot=(try? JSONSerialization.jsonObject(with:Data(self.engine.snapshot().utf8))) as? [String:Any]
+                    SourceExperience.shared.observe(rate:Double(snapshot?["rate"] as? Int ?? 0))
+                }
                 self.refreshTimeline()
                 if self.duration<=0,let seconds=video.currentItem?.duration.seconds,seconds.isFinite,seconds>0,self.loader?.supportsExternalCaptions != true { self.duration=seconds }
                 if Date().timeIntervalSince(self.lastSave)>=5 { self.saveProgress();self.lastSave=Date() }
@@ -465,6 +476,7 @@ extension NativeMedia: @unchecked Sendable {}
         if let option=onlineSubtitles.first(where:{$0.id==saved.id}) ?? onlineSubtitles.first(where:{$0.lang==saved.lang}) { await selectOnlineSubtitle(option) }
     }
     private func fail(_ text:String,nativeError:Error?=nil) {
+        if !recordedStartup,fixture==nil,let stream { SourceExperience.shared.record(stream,success:false);recordedStartup=true }
         #if DEBUG
         let diagnostic="Failure: \(text)\nNative error: \(String(describing:nativeError))\nError log: \(String(describing:player?.currentItem?.errorLog()?.events))\nMedia: \(media?.diagnostic() ?? "direct")\nTorrent: \(engine.snapshot())\n"
         try? diagnostic.write(to:FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("playback-failure.txt"),atomically:true,encoding:.utf8)
@@ -495,7 +507,7 @@ extension NativeMedia: @unchecked Sendable {}
         if reusingTorrent {
             if completed,let original,let lease=cacheLease { cacheStore.rememberCompletedPayload(original,in:lease) }
         } else { engine.stop();if let lease=cacheLease { cacheStore.pruneCompleted(lease,except:original) } }
-        if trimOriginal,!reusingTorrent,!discard,!completed,let original { try? FileManager.default.removeItem(atPath:original) }
+        if trimOriginal,!reusingTorrent,!discard,!completed,let original { VideoCacheCleanup.remove(URL(fileURLWithPath:original)) }
         if let lease=cacheLease,!reusingTorrent,(discard || completed || context == nil) { cacheStore.retire(lease) }
         cache=nil;cacheLease=nil
     }

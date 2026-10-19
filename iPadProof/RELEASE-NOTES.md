@@ -1,3 +1,13 @@
+## Playback and recommendations · 0.4.3 (12) · October 19, 2026
+
+Back navigation now retires torrent sessions and removes playback cache data away from the main thread. Source lists use lazy rows and compute their ranking in the background.
+
+A warm-yellow Recommended label highlights the first suggested source in the selected resolution filter. Ranking considers recent observed transfer speed and variability, provider-reported peers, file size and runtime, resolution, audio format, and previous startup results on this device. All sources remain selectable. Cold starts use a conservative estimate; this is not an internet speed test or a live probe of every torrent. iPad recommendations respect its existing 2 GiB limit. Known zero-peer torrents and AV1 sources are not recommended. Network estimates expire after an hour; recent source results remain local and expire after seven days.
+
+Home banner artwork now fits without cropping, blending into the text area.
+
+Validation: focused recommendation/runtime tests, cache cleanup race checks, and history/library regressions passed. Three generated native playback/start/exit cycles on the physical iPad measured 7–9 ms for synchronous stop cleanup. This does not measure external torrent shutdown or guarantee every navigation stall is resolved. A populated Mac episode source list displayed the recommendation and returned normally. Real-world source startup still depends on the swarm and media format.
+
 ## Security update · 0.4.2 (11) · October 13, 2026
 
 Patched FFmpeg 8.0.3 on both platforms; limited and protected add-on/subtitle downloads; hardened encrypted sync with fresh key agreement, direction binding and replay protection; bounded loopback server connections and protected local saved data. Detailed production playback diagnostic files are no longer written. See docs/SECURITY-REVIEW.md for findings, tests and limits.

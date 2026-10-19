@@ -29,8 +29,8 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
 <key>CFBundleDisplayName</key><string>binge</string>
 <key>CFBundleIconFile</key><string>binge</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.4.2</string>
-<key>CFBundleVersion</key><string>11</string>
+<key>CFBundleShortVersionString</key><string>0.4.3</string>
+<key>CFBundleVersion</key><string>12</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>NSLocalNetworkUsageDescription</key><string>binge finds your paired devices to sync viewing progress and your library on this network.</string>
 <key>NSBonjourServices</key><array><string>_binge-sync._tcp</string></array>

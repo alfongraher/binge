@@ -1,6 +1,19 @@
 import Foundation
 import CryptoKit
 
+/// Rename first, then unlink on a utility queue. A later playback can reuse
+/// the original pathname without an old cleanup deleting its new files.
+enum VideoCacheCleanup {
+    private static let queue=DispatchQueue(label:"binge.cache-cleanup",qos:.utility)
+    static func remove(_ url:URL) {
+        guard FileManager.default.fileExists(atPath:url.path) else { return }
+        let trash=url.deletingLastPathComponent().appendingPathComponent(".binge-retired-"+UUID().uuidString)
+        guard (try? FileManager.default.moveItem(at:url,to:trash)) != nil else { return }
+        queue.async { try? FileManager.default.removeItem(at:trash) }
+    }
+}
+
+
 @MainActor final class IPadCacheLease {
     let key:String
     let folder:URL
@@ -18,9 +31,10 @@ import CryptoKit
     init(root:URL?=nil) {
         self.root=root ?? FileManager.default.urls(for:.cachesDirectory,in:.userDomainMask)[0].appendingPathComponent("binge-watch-cache")
         try? FileManager.default.createDirectory(at:self.root,withIntermediateDirectories:true)
+        for orphan in (try? FileManager.default.contentsOfDirectory(at:self.root,includingPropertiesForKeys:nil)) ?? [] where orphan.lastPathComponent.hasPrefix(".binge-retired-") { VideoCacheCleanup.remove(orphan) }
         if let data=try? Data(contentsOf:self.root.appendingPathComponent("current.json")),let saved=try? JSONDecoder().decode(Manifest.self,from:data),UUID(uuidString:saved.folder) != nil {
             let folder=self.root.appendingPathComponent(saved.folder)
-            if saved.completed == true { try? FileManager.default.removeItem(at:folder);try? FileManager.default.removeItem(at:self.root.appendingPathComponent("current.json")) }
+            if saved.completed == true { VideoCacheCleanup.remove(folder);VideoCacheCleanup.remove(self.root.appendingPathComponent("current.json")) }
             else if FileManager.default.fileExists(atPath:folder.path) { current=IPadCacheLease(key:saved.key,folder:folder,sourceHash:saved.sourceHash) }
         }
         if root == nil {
@@ -28,15 +42,15 @@ import CryptoKit
             // Development proofs have isolated caches; they must not accumulate
             // beside the user's retained source when returning to the app.
             for name in ["binge-real-source-proof","binge-audio-proof","binge-feature-proof","binge-upnext-proof","binge-seek-proof"] {
-                try? FileManager.default.removeItem(at:caches.appendingPathComponent(name))
+                VideoCacheCleanup.remove(caches.appendingPathComponent(name))
             }
             let comparison=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("mac-reference.mp4")
-            try? FileManager.default.removeItem(at:comparison)
-            for folder in (try? FileManager.default.contentsOfDirectory(at:caches,includingPropertiesForKeys:nil)) ?? [] where folder.lastPathComponent.hasPrefix("binge-ipad-") && UUID(uuidString:String(folder.lastPathComponent.dropFirst("binge-ipad-".count))) != nil { try? FileManager.default.removeItem(at:folder) }
+            VideoCacheCleanup.remove(comparison)
+            for folder in (try? FileManager.default.contentsOfDirectory(at:caches,includingPropertiesForKeys:nil)) ?? [] where folder.lastPathComponent.hasPrefix("binge-ipad-") && UUID(uuidString:String(folder.lastPathComponent.dropFirst("binge-ipad-".count))) != nil { VideoCacheCleanup.remove(folder) }
         }
         if let current { pruneCompleted(current,except:nil) }
         // Only our own cache root is managed; retire orphaned prior selections.
-        for folder in (try? FileManager.default.contentsOfDirectory(at:self.root,includingPropertiesForKeys:nil)) ?? [] where UUID(uuidString:folder.lastPathComponent) != nil && folder != current?.folder { try? FileManager.default.removeItem(at:folder) }
+        for folder in (try? FileManager.default.contentsOfDirectory(at:self.root,includingPropertiesForKeys:nil)) ?? [] where UUID(uuidString:folder.lastPathComponent) != nil && folder != current?.folder { VideoCacheCleanup.remove(folder) }
     }
     func acquire(_ stream:AddonStream)->IPadCacheLease {
         let identity=(stream.infoHash ?? stream.playableSource ?? "")+"|"+String(stream.fileIdx ?? -1)
@@ -56,11 +70,11 @@ import CryptoKit
         guard current === lease else { return }
         if let data=try? JSONEncoder().encode(Manifest(key:lease.key,folder:lease.folder.lastPathComponent,completed:completed,sourceHash:lease.sourceHash)) { try? data.write(to:root.appendingPathComponent("current.json"),options:.atomic) }
     }
-    func workerEnded(_ lease:IPadCacheLease) { lease.workerFinished=true;if lease.discard { try? FileManager.default.removeItem(at:lease.folder) } }
+    func workerEnded(_ lease:IPadCacheLease) { lease.workerFinished=true;if lease.discard { VideoCacheCleanup.remove(lease.folder) } }
     func retire(_ lease:IPadCacheLease) {
         lease.discard=true
-        if lease.workerFinished { try? FileManager.default.removeItem(at:lease.folder) }
-        if current === lease { current=nil;try? FileManager.default.removeItem(at:root.appendingPathComponent("current.json")) }
+        if lease.workerFinished { VideoCacheCleanup.remove(lease.folder) }
+        if current === lease { current=nil;VideoCacheCleanup.remove(root.appendingPathComponent("current.json")) }
     }
     func rememberCompletedPayload(_ path:String,in lease:IPadCacheLease) {
         let prefix=lease.folder.standardizedFileURL.path+"/"
@@ -77,9 +91,9 @@ import CryptoKit
         for name in names {
             let url=lease.folder.appendingPathComponent(name).standardizedFileURL
             guard url.path.hasPrefix(lease.folder.standardizedFileURL.path+"/"),url.path != path else { continue }
-            try? FileManager.default.removeItem(at:url)
+            VideoCacheCleanup.remove(url)
         }
-        try? FileManager.default.removeItem(at:file)
+        VideoCacheCleanup.remove(file)
     }
     func clear() { if let current { retire(current) } }
 }

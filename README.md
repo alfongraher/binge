@@ -6,7 +6,7 @@
 
 A native movie and series app for **Mac and iPad**, with a simple library, thoughtful playback controls, and a place to pick up where you left off.
 
-**[Download Public Beta 1](https://github.com/alfongraher/binge/releases/tag/v0.4.2-security-update)** · **[User guide](docs/USER-GUIDE.md)** · **[Report an issue](https://github.com/alfongraher/binge/issues)**
+**[Download Public Beta 1](https://github.com/alfongraher/binge/releases/tag/v0.4.3)** · **[User guide](docs/USER-GUIDE.md)** · **[Report an issue](https://github.com/alfongraher/binge/issues)**
 
 </div>
 
@@ -27,6 +27,8 @@ The featured banner cycles through titles. Open a title for more information, sa
 Keep everything organized in **Plan to Watch**, **Favourites**, **Watching**, and **Watched**. Search your saved titles, filter movies and series, and choose how they’re sorted.
 
 Mark something watched elsewhere, change its label, or remove it with Undo. Series remember watched episodes and highlight where you last left off.
+
+Sources can highlight a **Recommended** option using recent connection performance, peers, file size, and previous startup results. You can always choose another source.
 
 ## Explore
 
@@ -61,7 +63,7 @@ Open Settings on both devices, enable sync, compare the pairing codes, and confi
 | Requirements | Apple silicon · macOS 14+ · Python 3.12 framework | iPadOS 17+ |
 | Installation | Extract and copy binge to Applications | Sign and install using a compatible sideloading tool |
 
-**[Get both versions →](https://github.com/alfongraher/binge/releases/tag/v0.4.2-security-update)**
+**[Get both versions →](https://github.com/alfongraher/binge/releases/tag/v0.4.3)**
 
 The Mac beta is development-signed and has not been notarized. The iPad package needs signing for your device; it is not an App Store or TestFlight installation. AltStore is an expected installation route, but this build has not yet been verified through a fresh AltStore setup. Free-account sideloading requires periodic refresh.
 

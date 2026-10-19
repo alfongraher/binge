@@ -8,6 +8,7 @@
 #include <libtorrent/session_status.hpp>
 #include <libtorrent/alert_types.hpp>
 #include <memory>
+#include <vector>
 #include <chrono>
 namespace lt = libtorrent;
 @implementation TorrentProof {
@@ -227,5 +228,14 @@ namespace lt = libtorrent;
     return [[NSString alloc]initWithData:[NSJSONSerialization dataWithJSONObject:value options:0 error:nil] encoding:NSUTF8StringEncoding];
 }
 - (void)selectNextFile { _selected=2;_handle.clear_piece_deadlines(); _handle.prioritize_files(std::vector<lt::download_priority_t>{lt::dont_download,lt::dont_download,lt::download_priority_t(7)}); }
-- (void)stop { _client.reset();_seed.reset();_connected=false; }
+- (void)dealloc { [self stop]; }
+- (void)stop {
+    // Keep abort proxies alive off the UI thread: their destruction waits for
+    // tracker notifications, disk flushes and the session's network threads.
+    auto retiring=std::make_shared<std::vector<lt::session_proxy>>();
+    if(_client)retiring->push_back(_client->abort());
+    if(_seed)retiring->push_back(_seed->abort());
+    _client.reset();_seed.reset();_handle=lt::torrent_handle();_seedHandle=lt::torrent_handle();_connected=false;
+    if(!retiring->empty())dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY,0), ^{ retiring->clear(); });
+}
 @end

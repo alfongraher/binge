@@ -173,7 +173,7 @@ private struct HomeFeaturedBanner:View {
             let found=titles[index]
             GeometryReader { geo in
                 ZStack(alignment:.bottomLeading) {
-                    AsyncImage(url:found.title.background ?? found.title.poster) { image in image.resizable().scaledToFill() } placeholder: { Color.white.opacity(0.04) }.frame(width:geo.size.width,height:geo.size.height).clipped()
+                    AsyncImage(url:found.title.background ?? found.title.poster) { image in image.resizable().scaledToFit().mask(LinearGradient(stops:[.init(color:.clear,location:0),.init(color:.black,location:0.2),.init(color:.black,location:1)],startPoint:.leading,endPoint:.trailing)) } placeholder: { Color.white.opacity(0.04) }.frame(width:geo.size.width,height:geo.size.height,alignment:.trailing).background(.black).clipped()
                     LinearGradient(colors:[.black.opacity(0.8),.black.opacity(0.3),.clear],startPoint:.leading,endPoint:.trailing)
                     LinearGradient(colors:[.clear,.black.opacity(0.92)],startPoint:.top,endPoint:.bottom)
                     VStack(alignment:.leading,spacing:14) {
